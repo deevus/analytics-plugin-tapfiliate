@@ -1,4 +1,4 @@
-import { AnalyticsPlugin } from 'analytics';
+import { AnalyticsPlugin, AnalyticsInstance } from 'analytics';
 
 export function scriptLoaded(scriptSrc: string) {
   const scripts = document.querySelectorAll<HTMLScriptElement>('script[src]');
@@ -24,37 +24,55 @@ export function insertScriptIfNotPresent(scriptSrc: string) {
 
 interface TapStatic {
   (action: 'create', tapfiliateId: string, options: Record<string, string>): void;
-  (action: 'detect'): void;
+  (action: 'detect', options?: {
+    cookie_domain?: string;
+    referral_code_param?: string;
+  }): void;
+  (action: 'customer' | 'trial' | 'lead', userId: string, options?: {
+    meta_data?: Record<string, any>;
+  }): void;
+  (action: 'conversion', externalId?: string, amount?: number, options?: {
+    meta_data?: Record<string, any>;
+    customer_id?: string;
+    currency?: string;
+  }, commissionType?: string): void;
   loaded?: boolean;
   q?: IArguments[];
 }
 
 declare global {
   interface Window {
-    tap?: TapStatic;
+    tap: TapStatic;
     TapfiliateObject?: string;
   }
 }
 
 export interface TapfiliatePluginConfig {
   tapfiliateId?: string;
+  customerType?: 'customer' | 'trial' | 'lead';
+  cookieDomain?: string;
+  referralCodeParam?: string;
 }
 
-export type TapfiliatePluginArgs = TapfiliatePluginConfig;
+interface Params {
+  payload: {
+    userId: string;
+    traits: Record<string, any>;
+  };
+  config: TapfiliatePluginConfig;
+}
 
-const tapfiliatePlugin = ({ tapfiliateId }: TapfiliatePluginConfig): AnalyticsPlugin => {
+const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
   const sharedConfig = {
-    name: 'tapfiliate-plugin',
-    config: {
-      tapfiliateId,
-    },
+    name: 'tapfiliate',
+    config,
   };
 
   if (process.env.BROWSER) {
     return {
       ...sharedConfig,
 
-      initialize({ config }: { config: TapfiliatePluginConfig }) {
+      initialize({ config }: { config: TapfiliatePluginConfig }): void {
         if (!config.tapfiliateId) throw new Error('No Tapfiliate tapfiliateId defined');
 
         const scriptSrc = 'https://script.tapfiliate.com/tapfiliate.js';
@@ -71,15 +89,39 @@ const tapfiliatePlugin = ({ tapfiliateId }: TapfiliatePluginConfig): AnalyticsPl
           }
         })(window, 'tap');
 
-        window.tap?.('create', config.tapfiliateId, {
+        window.tap('create', config.tapfiliateId, {
           integration: 'javascript',
         });
-        window.tap?.('detect');
+      },
+
+      ready({ config }: Params) {
+        window.tap('detect', {
+          cookie_domain: config.cookieDomain,
+          referral_code_param: config.referralCodeParam,
+        });
+      },
+
+      identify({ payload, config }: Params): void {
+        const { userId } = payload;
+
+        window.tap(config.customerType ?? 'customer', userId, {
+          meta_data: payload.traits,
+        });
       },
 
       loaded() {
         return window.tap?.loaded ?? false;
-      }
+      },
+
+      methods: {
+        conversion(this: { instance: AnalyticsInstance }, externalId?: string, amount?: number) {
+          const { traits } = this.instance.user();
+
+          window.tap('conversion', externalId, amount, {
+            meta_data: traits,
+          });
+        },
+      },
     };
   } else {
     return sharedConfig;
