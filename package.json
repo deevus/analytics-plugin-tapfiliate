@@ -30,7 +30,8 @@
   "scripts": {
     "dev": "webpack -c webpack.dev.ts",
     "build": "webpack -c webpack.prod.ts",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "ci": "yarn install && yarn build"
   },
   "types": "./dist/index.d.ts"
 }
