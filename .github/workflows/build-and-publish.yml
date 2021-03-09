@@ -2,9 +2,8 @@ name: Build and Publish
 on:
   release:
     types: [created]
-  push:
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
