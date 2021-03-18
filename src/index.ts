@@ -1,10 +1,5 @@
+import { isScriptLoaded } from "analytics-utils";
 import { AnalyticsPlugin, AnalyticsInstance } from "analytics";
-
-export function scriptLoaded(scriptSrc: string): boolean {
-  const scripts = document.querySelectorAll<HTMLScriptElement>("script[src]");
-
-  return Array.from(scripts).some((script) => script.src === scriptSrc);
-}
 
 export function insertScript(scriptSrc: string): void {
   const scriptElement = document.createElement("script");
@@ -16,7 +11,7 @@ export function insertScript(scriptSrc: string): void {
 }
 
 export function insertScriptIfNotPresent(scriptSrc: string): void {
-  if (!scriptLoaded(scriptSrc)) {
+  if (!isScriptLoaded(scriptSrc)) {
     insertScript(scriptSrc);
   }
 }
@@ -67,7 +62,7 @@ declare global {
 }
 
 export interface TapfiliatePluginConfig {
-  tapfiliateId?: string;
+  tapfiliateId: string;
   customerType?: "customer" | "trial" | "lead";
   cookieDomain?: string;
   referralCodeParam?: string;
@@ -98,27 +93,12 @@ const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
         const scriptSrc = "https://script.tapfiliate.com/tapfiliate.js";
 
         insertScriptIfNotPresent(scriptSrc);
-
-        (function (window: Window, tapKey: "tap") {
-          window["TapfiliateObject"] = tapKey;
-
-          window[tapKey] =
-            window[tapKey] ||
-            function () {
-              const queue = ((window[tapKey] as TapStatic).q =
-                window[tapKey]?.q || []);
-
-              // eslint-disable-next-line prefer-rest-params
-              queue.push(arguments);
-            };
-        })(window, "tap");
-
-        window.tap("create", config.tapfiliateId, {
-          integration: "javascript",
-        });
       },
 
       ready({ config }: Params) {
+        window.tap("create", config.tapfiliateId, {
+          integration: "javascript",
+        });
         window.tap("detect", {
           cookie_domain: config.cookieDomain,
           referral_code_param: config.referralCodeParam,
