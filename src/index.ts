@@ -66,7 +66,14 @@ declare global {
   }
 }
 
-export interface TapfiliatePluginConfig {
+export interface TapfiliatePluginControl {
+  disableInitialize?: boolean,
+  disableReady?: boolean,
+  disableIdentify?: boolean,
+  disableLoaded?: boolean
+}
+
+export interface TapfiliatePluginConfig extends TapfiliatePluginControl{
   tapfiliateId?: string;
   customerType?: "customer" | "trial" | "lead";
   cookieDomain?: string;
@@ -81,7 +88,13 @@ interface Params {
   config: TapfiliatePluginConfig;
 }
 
-const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
+const tapfiliatePlugin = ({
+  disableInitialize = false,
+  disableReady = false,
+  disableIdentify = false,
+  disableLoaded = false,
+  ...config
+}: TapfiliatePluginConfig): AnalyticsPlugin => {
   const sharedConfig = {
     name: "tapfiliate",
     config,
@@ -92,6 +105,8 @@ const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
       ...sharedConfig,
 
       initialize({ config }: { config: TapfiliatePluginConfig }): void {
+        if(disableInitialize) return;
+
         if (!config.tapfiliateId)
           throw new Error("No Tapfiliate tapfiliateId defined");
 
@@ -119,6 +134,8 @@ const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
       },
 
       ready({ config }: Params) {
+        if(disableReady) return;
+
         window.tap("detect", {
           cookie_domain: config.cookieDomain,
           referral_code_param: config.referralCodeParam,
@@ -126,6 +143,8 @@ const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
       },
 
       identify({ payload, config }: Params): void {
+        if(disableIdentify) return;
+
         const { userId } = payload;
 
         window.tap(config.customerType ?? "customer", userId, {
@@ -134,6 +153,8 @@ const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
       },
 
       loaded() {
+        if(disableLoaded) return false;
+
         return window.tap?.loaded ?? false;
       },
 
