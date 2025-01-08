@@ -1,5 +1,10 @@
-import { isScriptLoaded } from "analytics-utils";
 import { AnalyticsPlugin, AnalyticsInstance } from "analytics";
+
+export function scriptLoaded(scriptSrc: string): boolean {
+  const scripts = document.querySelectorAll<HTMLScriptElement>("script[src]");
+
+  return Array.from(scripts).some((script) => script.src === scriptSrc);
+}
 
 export function insertScript(scriptSrc: string): void {
   const scriptElement = document.createElement("script");
@@ -11,7 +16,7 @@ export function insertScript(scriptSrc: string): void {
 }
 
 export function insertScriptIfNotPresent(scriptSrc: string): void {
-  if (!isScriptLoaded(scriptSrc)) {
+  if (!scriptLoaded(scriptSrc)) {
     insertScript(scriptSrc);
   }
 }
@@ -61,8 +66,15 @@ declare global {
   }
 }
 
-export interface TapfiliatePluginConfig {
-  tapfiliateId: string;
+export interface TapfiliatePluginControl {
+  disableInitialize?: boolean;
+  disableReady?: boolean;
+  disableIdentify?: boolean;
+  disableLoaded?: boolean;
+}
+
+export interface TapfiliatePluginConfig extends TapfiliatePluginControl {
+  tapfiliateId?: string;
   customerType?: "customer" | "trial" | "lead";
   cookieDomain?: string;
   referralCodeParam?: string;
@@ -76,7 +88,13 @@ interface Params {
   config: TapfiliatePluginConfig;
 }
 
-const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
+const tapfiliatePlugin = ({
+  disableInitialize = false,
+  disableReady = false,
+  disableIdentify = false,
+  disableLoaded = false,
+  ...config
+}: TapfiliatePluginConfig): AnalyticsPlugin => {
   const sharedConfig = {
     name: "tapfiliate",
     config,
@@ -87,18 +105,37 @@ const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
       ...sharedConfig,
 
       initialize({ config }: { config: TapfiliatePluginConfig }): void {
+        if (disableInitialize) return;
+
         if (!config.tapfiliateId)
           throw new Error("No Tapfiliate tapfiliateId defined");
 
         const scriptSrc = "https://script.tapfiliate.com/tapfiliate.js";
 
         insertScriptIfNotPresent(scriptSrc);
-      },
 
-      ready({ config }: Params) {
+        (function (window: Window, tapKey: "tap") {
+          window["TapfiliateObject"] = tapKey;
+
+          window[tapKey] =
+            window[tapKey] ||
+            function () {
+              const queue = ((window[tapKey] as TapStatic).q =
+                window[tapKey]?.q || []);
+
+              // eslint-disable-next-line prefer-rest-params
+              queue.push(arguments);
+            };
+        })(window, "tap");
+
         window.tap("create", config.tapfiliateId, {
           integration: "javascript",
         });
+      },
+
+      ready({ config }: Params) {
+        if (disableReady) return;
+
         window.tap("detect", {
           cookie_domain: config.cookieDomain,
           referral_code_param: config.referralCodeParam,
@@ -106,6 +143,8 @@ const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
       },
 
       identify({ payload, config }: Params): void {
+        if (disableIdentify) return;
+
         const { userId } = payload;
 
         window.tap(config.customerType ?? "customer", userId, {
@@ -114,6 +153,8 @@ const tapfiliatePlugin = (config: TapfiliatePluginConfig): AnalyticsPlugin => {
       },
 
       loaded() {
+        if (disableLoaded) return false;
+
         return window.tap?.loaded ?? false;
       },
 
