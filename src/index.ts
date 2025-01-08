@@ -67,13 +67,13 @@ declare global {
 }
 
 export interface TapfiliatePluginControl {
-  disableInitialize?: boolean,
-  disableReady?: boolean,
-  disableIdentify?: boolean,
-  disableLoaded?: boolean
+  disableInitialize?: boolean;
+  disableReady?: boolean;
+  disableIdentify?: boolean;
+  disableLoaded?: boolean;
 }
 
-export interface TapfiliatePluginConfig extends TapfiliatePluginControl{
+export interface TapfiliatePluginConfig extends TapfiliatePluginControl {
   tapfiliateId?: string;
   customerType?: "customer" | "trial" | "lead";
   cookieDomain?: string;
@@ -105,7 +105,7 @@ const tapfiliatePlugin = ({
       ...sharedConfig,
 
       initialize({ config }: { config: TapfiliatePluginConfig }): void {
-        if(disableInitialize) return;
+        if (disableInitialize) return;
 
         if (!config.tapfiliateId)
           throw new Error("No Tapfiliate tapfiliateId defined");
@@ -134,7 +134,7 @@ const tapfiliatePlugin = ({
       },
 
       ready({ config }: Params) {
-        if(disableReady) return;
+        if (disableReady) return;
 
         window.tap("detect", {
           cookie_domain: config.cookieDomain,
@@ -143,7 +143,7 @@ const tapfiliatePlugin = ({
       },
 
       identify({ payload, config }: Params): void {
-        if(disableIdentify) return;
+        if (disableIdentify) return;
 
         const { userId } = payload;
 
@@ -153,7 +153,7 @@ const tapfiliatePlugin = ({
       },
 
       loaded() {
-        if(disableLoaded) return false;
+        if (disableLoaded) return false;
 
         return window.tap?.loaded ?? false;
       },
